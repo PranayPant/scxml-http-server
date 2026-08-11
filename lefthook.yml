@@ -1,0 +1,18 @@
+# Lefthook configuration — pre-commit quality pipeline.
+# Docs: https://github.com/evilmartians/lefthook
+#
+# Run `lefthook install` after editing this file to (re)write the git hooks.
+#
+# The test/coverage stages are intentionally omitted for now: the user wants
+# tests designed after the HTTP engine implementation is done. Add them back
+# (mix test --stale, mix test --cover) once real test suites exist.
+
+pre-commit:
+  parallel: true
+  commands:
+    styler-and-format:
+      glob: "*.{ex,exs}"
+      run: mix format --check-formatted
+    credo-linter:
+      glob: "*.{ex,exs}"
+      run: mix credo --strict
