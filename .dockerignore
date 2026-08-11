@@ -1,0 +1,25 @@
+# Build artifacts
+_build/
+deps/
+cover/
+doc/
+tmp/
+.elixir_ls/
+
+# Crash dumps
+erl_crash.dump
+
+# Archive / package artifacts
+*.ez
+scxml_http_engine-*.tar
+
+# VCS / editor / CI
+.git/
+.gitignore
+.gitattributes
+.idea/
+.vscode/
+*.swp
+
+# Tests & tooling not needed at build time (deps are fetched inside the image)
+test/

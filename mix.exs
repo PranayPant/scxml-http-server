@@ -7,7 +7,18 @@ defmodule ScxmlHttpEngine.MixProject do
       version: "0.1.0",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
+      releases: releases(),
       deps: deps()
+    ]
+  end
+
+  # Run "mix help release" to learn about releases.
+  defp releases do
+    [
+      scxml_http_engine: [
+        include_executables_for: [:unix],
+        steps: [:assemble]
+      ]
     ]
   end
 
@@ -23,12 +34,24 @@ defmodule ScxmlHttpEngine.MixProject do
   defp deps do
     [
       # Transports on top of the in-process SCXML runtime.
-      {:scxml_orchestrator, path: "../scxml-orchestrator"},
+      #
+      # Local dev uses the sibling checkout (../scxml-orchestrator); container
+      # / CI builds where that path does not exist fall back to the git
+      # dependency so `docker build` works without extra context.
+      scxml_orchestrator_dep(),
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7"},
       # Code-quality toolchain (dev/test only) — see lefthook.yml.
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false}
     ]
+  end
+
+  defp scxml_orchestrator_dep do
+    if File.dir?("../scxml-orchestrator") do
+      {:scxml_orchestrator, path: "../scxml-orchestrator"}
+    else
+      {:scxml_orchestrator, git: "https://github.com/PranayPant/scxml-orchestrator.git"}
+    end
   end
 end

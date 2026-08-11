@@ -4,9 +4,10 @@ This document plans the HTTP engine implementation once the scaffolding +
 pre-commit pipeline are in place. It drives the `ScxmlHttpEngine` transport on
 top of the `scxml-orchestrator` library's `ScxmlEngine` public API.
 
-> Current state: scaffolding is complete (Application + `Router` stub with
-> `/healthz` + 404 catch-all). The statechart endpoints below are **not** yet
-> implemented. Tests are intentionally omitted until this implementation lands.
+> **STATUS: end-to-end implementation + Docker build complete (2026-08-11).**
+> The endpoints below are implemented and verified (see §8). Remaining
+> future work: durability/snapshot persistence, Horde distribution, and the
+> test suites (intentionally still deferred).
 
 ## 0. Confirmed library API (from `scxml-orchestrator` `lib/scxml_engine.ex`)
 
@@ -107,3 +108,40 @@ in a small `Engine` facade so routes stay declarative and testable.
 - Tests (deferred; see note).
 - Auth/rate-limiting.
 - Persistence & Horde (deferred phases §5.5–5.6).
+- `GET /statecharts/:graphId` (graph describe) — needs a side-table; deferred.
+
+## 8. Shipped & verified (2026-08-11)
+
+**Modules added**
+- `lib/scxml_http_engine/engine.ex` — facade over `ScxmlEngine`
+  (`register_and_start/2`, `start_instance/3`, `step/3`, `snapshot/1`,
+  `list_instances/0`, `remove_instance/1`).
+- `lib/scxml_http_engine/error.ex` — `to_json/1` maps `Engine` results to
+  `{status, body}` (`200`/`201`/`400`/`404`).
+- `lib/scxml_http_engine/router.ex` — routes wired to the facade.
+
+**Endpoints verified via curl against a running server and a running container**
+
+| Method/Path | Result |
+| --- | --- |
+| `POST /statecharts` | 201, starts instance, returns snapshot |
+| `POST /instances` | 201 (valid graph); 400 (unknown graph) |
+| `GET /instances/:id` | 200 snapshot; 404 after delete |
+| `POST /instances/:id/events` | 200 settled state (synchronous step) |
+| `GET /instances` | 200 array of snapshots |
+| `DELETE /instances/:id` | 200 `{"deleted":true}`; then 404 |
+| `GET /healthz` | 200; unknown route 404; bad JSON 400 |
+
+**Docker**
+- Multi-stage `Dockerfile` → self-contained Mix release on `debian:bookworm-slim`.
+- `mix.exs`: conditional dep — path (`../scxml-orchestrator`) locally, git
+  fallback in the container (needs git in builder).
+- `config/runtime.exs`: runtime-configurable `SCXML_HTTP_ENGINE_PORT`.
+- Verified: image builds (~164 MB), container boots clean (UTF-8 locale set),
+  full statechart flow works over HTTP inside the container.
+
+**Notes**
+- `DELETE` uses `GenServer.stop(pid)`; the library's registry entry is keyed to
+  the instance process, so it auto-unregisters on termination.
+- `instance_id` resolution: when omitted, `register_and_start` recovers it by
+  matching the pid against `instances/0`.
