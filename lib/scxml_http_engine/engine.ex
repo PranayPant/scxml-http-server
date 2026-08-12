@@ -22,9 +22,18 @@ defmodule ScxmlHttpEngine.Engine do
   """
   @spec register_and_start(String.t(), String.t() | nil) :: {:ok, snapshot()} | {:error, term()}
   def register_and_start(document, instance_id) do
-    with {:ok, pid} <- ScxmlEngine.run(document, instance_id: instance_id) do
-      resolved_id = instance_id || instance_id_for_pid(pid)
-      {:ok, snapshot_for(resolved_id, pid)}
+    opts = if is_binary(instance_id), do: [instance_id: instance_id], else: []
+
+    try do
+      with {:ok, pid} <- ScxmlEngine.run(document, opts) do
+        resolved_id = instance_id || instance_id_for_pid(pid)
+        {:ok, snapshot_for(resolved_id, pid)}
+      end
+    rescue
+      # The library raises for structurally-invalid-but-parseable AST JSON
+      # (e.g. `%{"scxml" => "garbage"}`). At this HTTP boundary we convert
+      # that into a clean {:error, reason} so the router can map it to 400.
+      error -> {:error, error}
     end
   end
 
@@ -104,10 +113,34 @@ defmodule ScxmlHttpEngine.Engine do
     case ScxmlEngine.instance_pid(instance_id) do
       {:ok, pid} ->
         GenServer.stop(pid)
+        wait_until_unregistered(instance_id)
         {:ok, :deleted}
 
       _ ->
         {:error, :not_found}
+    end
+  end
+
+  # GenServer.stop/3 is synchronous for the process itself, but the library
+  # registry removes the entry asynchronously on the owner's DOWN. Poll briefly
+  # so the "removed" contract holds immediately after this call returns.
+  #
+  # Public with @doc false solely so the defensive timeout branch (attempts == 0)
+  # can be exercised directly by the test suite.
+  @doc false
+  @spec wait_until_unregistered(String.t(), pos_integer()) :: :ok
+  def wait_until_unregistered(instance_id, attempts \\ 50)
+
+  def wait_until_unregistered(_instance_id, 0), do: :ok
+
+  def wait_until_unregistered(instance_id, attempts) do
+    case ScxmlEngine.instance_pid(instance_id) do
+      {:ok, _pid} ->
+        Process.sleep(10)
+        wait_until_unregistered(instance_id, attempts - 1)
+
+      _ ->
+        :ok
     end
   end
 

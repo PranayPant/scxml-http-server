@@ -11,19 +11,19 @@ top of the `scxml-orchestrator` library's `ScxmlEngine` public API.
 
 ## 0. Confirmed library API (from `scxml-orchestrator` `lib/scxml_engine.ex`)
 
-| Function | Signature | Notes |
-| --- | --- | --- |
-| `run/2` | `run(ast_json, opts)` → `{:ok, pid} \| {:error, term}` | load+store+start in one go |
-| `load/1` | `load(json)` → `{:ok, graph}` | parse AST JSON |
-| `store/2` | `store(graph, graph_id \\ nil)` → `{:ok, graph_id}` | compile + persist graph |
-| `start_instance/1` | `start_instance(opts)` → `{:ok, pid} \| :error` | opts: `:graph_id`, `:instance_id`, `:initial_datamodel` |
-| `send_event/3` | `send_event(pid, name, payload \\ %{})` → `:ok` | synchronous step by pid |
-| `send_event_to/3` | `send_event_to(id, name, payload \\ %{})` → `:ok \| :error` | route by instance id |
-| `instance_pid/1` | `instance_pid(id)` → `{:ok, pid} \| :error \| nil` | registry lookup |
-| `active_configuration/1` | `active_configuration(pid)` → `MapSet.t` | encode as JSON array |
-| `datamodel/1` | `datamodel(pid)` → `map` | |
-| `done?/1` | `done?(pid)` → `boolean` | terminal-state detection |
-| `instances/0` | `instances()` → `[{id, pid}]` | enumerate |
+| Function                 | Signature                                                   | Notes                                                   |
+| ------------------------ | ----------------------------------------------------------- | ------------------------------------------------------- |
+| `run/2`                  | `run(ast_json, opts)` → `{:ok, pid} \| {:error, term}`      | load+store+start in one go                              |
+| `load/1`                 | `load(json)` → `{:ok, graph}`                               | parse AST JSON                                          |
+| `store/2`                | `store(graph, graph_id \\ nil)` → `{:ok, graph_id}`         | compile + persist graph                                 |
+| `start_instance/1`       | `start_instance(opts)` → `{:ok, pid} \| :error`             | opts: `:graph_id`, `:instance_id`, `:initial_datamodel` |
+| `send_event/3`           | `send_event(pid, name, payload \\ %{})` → `:ok`             | synchronous step by pid                                 |
+| `send_event_to/3`        | `send_event_to(id, name, payload \\ %{})` → `:ok \| :error` | route by instance id                                    |
+| `instance_pid/1`         | `instance_pid(id)` → `{:ok, pid} \| :error \| nil`          | registry lookup                                         |
+| `active_configuration/1` | `active_configuration(pid)` → `MapSet.t`                    | encode as JSON array                                    |
+| `datamodel/1`            | `datamodel(pid)` → `map`                                    |                                                         |
+| `done?/1`                | `done?(pid)` → `boolean`                                    | terminal-state detection                                |
+| `instances/0`            | `instances()` → `[{id, pid}]`                               | enumerate                                               |
 
 ## 1. Module layout
 
@@ -41,15 +41,15 @@ in a small `Engine` facade so routes stay declarative and testable.
 
 ## 2. Endpoint surface (matches README §8)
 
-| Method | Path | Flow | Success | Errors |
-| --- | --- | --- | --- | --- |
-| `POST` | `/statecharts` | body `{"document": <AST JSON>, "instance_id"?: id}` → `ScxmlEngine.run/2` | 201 `{instance_id, configuration}` | 400 bad AST / unknown |
-| `GET` | `/statecharts/:graphId` | describe a stored graph (via `load`/inspect) | 200 graph metadata | 404 |
-| `POST` | `/instances` | body `{"graph_id": g, "initial_datamodel"?: m}` → `start_instance/1` | 201 `{instance_id, configuration}` | 400 unknown graph_id |
-| `GET` | `/instances/:id` | `instance_pid/1` → snapshot | 200 `{configuration, datamodel, done}` | 404 |
-| `POST` | `/instances/:id/events` | body `{"name": n, "data": d}` → `send_event_to/3` | 200 settled state | 404 instance / bad event |
-| `DELETE` | `/instances/:id` | stop & unregister instance | 204 | 404 |
-| `GET` | `/instances` | `instances/0` → list | 200 `[{id, configuration}]` | — |
+| Method   | Path                    | Flow                                                                      | Success                                | Errors                   |
+| -------- | ----------------------- | ------------------------------------------------------------------------- | -------------------------------------- | ------------------------ |
+| `POST`   | `/statecharts`          | body `{"document": <AST JSON>, "instance_id"?: id}` → `ScxmlEngine.run/2` | 201 `{instance_id, configuration}`     | 400 bad AST / unknown    |
+| `GET`    | `/statecharts/:graphId` | describe a stored graph (via `load`/inspect)                              | 200 graph metadata                     | 404                      |
+| `POST`   | `/instances`            | body `{"graph_id": g, "initial_datamodel"?: m}` → `start_instance/1`      | 201 `{instance_id, configuration}`     | 400 unknown graph_id     |
+| `GET`    | `/instances/:id`        | `instance_pid/1` → snapshot                                               | 200 `{configuration, datamodel, done}` | 404                      |
+| `POST`   | `/instances/:id/events` | body `{"name": n, "data": d}` → `send_event_to/3`                         | 200 settled state                      | 404 instance / bad event |
+| `DELETE` | `/instances/:id`        | stop & unregister instance                                                | 204                                    | 404                      |
+| `GET`    | `/instances`            | `instances/0` → list                                                      | 200 `[{id, configuration}]`            | —                        |
 
 ## 3. Serialization rules
 
@@ -63,7 +63,7 @@ in a small `Engine` facade so routes stay declarative and testable.
 
 ## 4. Concurrency & lifecycle notes
 
-- Each `send_event_to` is a blocking `GenServer.call` on the *instance* process;
+- Each `send_event_to` is a blocking `GenServer.call` on the _instance_ process;
   a slow/hung instance holds only its own mailbox — other instances keep
   stepping. No global locks needed.
 - `ScxmlOrchestrator.Application` (Registry + Instance supervisor) is already
@@ -82,7 +82,7 @@ in a small `Engine` facade so routes stay declarative and testable.
 4. **Boot & manual verify** — run server, `curl` each endpoint with a small
    sample AST document (e.g. the traffic-light example).
 5. **Durability (later phase)** — snapshot `{instance_id, configuration,
-   datamodel, graph_id}` after each macrostep; rehydrate on boot via
+datamodel, graph_id}` after each macrostep; rehydrate on boot via
    `run/2` with `initial_datamodel`. Requires storing the original AST JSON.
 6. **Distribution (optional later phase)** — swap Registry/DynamicSupervisor for
    Horde; make `send_event_to` node-aware at the routing seam.
@@ -113,6 +113,7 @@ in a small `Engine` facade so routes stay declarative and testable.
 ## 8. Shipped & verified (2026-08-11)
 
 **Modules added**
+
 - `lib/scxml_http_engine/engine.ex` — facade over `ScxmlEngine`
   (`register_and_start/2`, `start_instance/3`, `step/3`, `snapshot/1`,
   `list_instances/0`, `remove_instance/1`).
@@ -122,17 +123,18 @@ in a small `Engine` facade so routes stay declarative and testable.
 
 **Endpoints verified via curl against a running server and a running container**
 
-| Method/Path | Result |
-| --- | --- |
-| `POST /statecharts` | 201, starts instance, returns snapshot |
-| `POST /instances` | 201 (valid graph); 400 (unknown graph) |
-| `GET /instances/:id` | 200 snapshot; 404 after delete |
-| `POST /instances/:id/events` | 200 settled state (synchronous step) |
-| `GET /instances` | 200 array of snapshots |
-| `DELETE /instances/:id` | 200 `{"deleted":true}`; then 404 |
-| `GET /healthz` | 200; unknown route 404; bad JSON 400 |
+| Method/Path                  | Result                                 |
+| ---------------------------- | -------------------------------------- |
+| `POST /statecharts`          | 201, starts instance, returns snapshot |
+| `POST /instances`            | 201 (valid graph); 400 (unknown graph) |
+| `GET /instances/:id`         | 200 snapshot; 404 after delete         |
+| `POST /instances/:id/events` | 200 settled state (synchronous step)   |
+| `GET /instances`             | 200 array of snapshots                 |
+| `DELETE /instances/:id`      | 200 `{"deleted":true}`; then 404       |
+| `GET /healthz`               | 200; unknown route 404; bad JSON 400   |
 
 **Docker**
+
 - Multi-stage `Dockerfile` → self-contained Mix release on `debian:bookworm-slim`.
 - `mix.exs`: conditional dep — path (`../scxml-orchestrator`) locally, git
   fallback in the container (needs git in builder).
@@ -141,6 +143,7 @@ in a small `Engine` facade so routes stay declarative and testable.
   full statechart flow works over HTTP inside the container.
 
 **Notes**
+
 - `DELETE` uses `GenServer.stop(pid)`; the library's registry entry is keyed to
   the instance process, so it auto-unregisters on termination.
 - `instance_id` resolution: when omitted, `register_and_start` recovers it by

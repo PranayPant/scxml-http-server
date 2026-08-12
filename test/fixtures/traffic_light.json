@@ -1,0 +1,56 @@
+{
+  "scxml": {
+    "id": "test_traffic",
+    "initial": "red",
+    "version": "1.0",
+    "states": [
+      {
+        "id": "red",
+        "type": "atomic",
+        "onentry": [
+          { "kind": "assign", "location": "data.color", "expr": "\"red\"" }
+        ],
+        "transitions": [
+          {
+            "id": "red_to_green",
+            "event": "next",
+            "target": "green"
+          }
+        ],
+        "metadata": []
+      },
+      {
+        "id": "green",
+        "type": "atomic",
+        "onentry": [
+          { "kind": "assign", "location": "data.color", "expr": "\"green\"" }
+        ],
+        "transitions": [
+          {
+            "id": "green_to_yellow",
+            "event": "next",
+            "target": "yellow"
+          }
+        ],
+        "metadata": []
+      },
+      {
+        "id": "yellow",
+        "type": "atomic",
+        "onentry": [
+          { "kind": "assign", "location": "data.color", "expr": "\"yellow\"" }
+        ],
+        "transitions": [
+          {
+            "id": "yellow_to_red",
+            "event": "next",
+            "target": "red"
+          }
+        ],
+        "metadata": []
+      }
+    ],
+    "parallels": [],
+    "finals": []
+  }
+}

@@ -9,15 +9,15 @@ projects share identical formatting and linting discipline.
 
 See [`lefthook.yml`](./lefthook.yml). Stages run **in parallel**:
 
-| Command | What it does |
-| --- | --- |
-| `mix format --check-formatted` | Fails if any `.ex`/`.exs` is not Styler+formatter clean |
-| `mix credo --strict` | Fails on Credo issues (readability, design, refactoring, warnings) |
+| Command                        | What it does                                                       |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `mix format --check-formatted` | Fails if any `.ex`/`.exs` is not Styler+formatter clean            |
+| `mix credo --strict`           | Fails on Credo issues (readability, design, refactoring, warnings) |
 
 Both stages glob `*.{ex,exs}`, so untouched files are skipped.
 
 > **Tests are intentionally omitted for now.** The plan is to design the test
-> suites *after* the HTTP engine implementation is done. Once real tests
+> suites _after_ the HTTP engine implementation is done. Once real tests
 > exist, add `mix test --stale` and `mix test --cover` as additional
 > `pre-commit.commands` stages (as the reference library does).
 

@@ -7,8 +7,21 @@ defmodule ScxmlHttpEngine.MixProject do
       version: "0.1.0",
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
+      elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [summary: [threshold: 100], ignore_modules: ignored_modules()],
       releases: releases(),
       deps: deps()
+    ]
+  end
+
+  # Modules that are not covered by unit / Plug.Test tests (they boot the
+  # real cowboy listener and are exercised by integration tests, which are
+  # intentionally out of scope for now). Mirroring scxml-orchestrator's
+  # `ignore_modules` usage.
+  defp ignored_modules do
+    [
+      ScxmlHttpEngine.Application,
+      ScxmlHttpEngine
     ]
   end
 
@@ -29,6 +42,9 @@ defmodule ScxmlHttpEngine.MixProject do
       mod: {ScxmlHttpEngine.Application, []}
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
