@@ -10,7 +10,15 @@ defmodule ScxmlHttpEngine.Engine do
   the router can map results to HTTP status codes deterministically.
   """
 
-  @type snapshot :: %{instance_id: String.t(), configuration: [String.t()], datamodel: map(), done: boolean()}
+  @type execution_status :: :idle | :running | :completed | :error
+
+  @type snapshot :: %{
+          instance_id: String.t(),
+          configuration: [String.t()],
+          datamodel: map(),
+          done: boolean(),
+          execution_status: execution_status()
+        }
 
   @doc """
   Load + compile + start an instance from an uploaded AST JSON document.
@@ -103,11 +111,6 @@ defmodule ScxmlHttpEngine.Engine do
 
   Returns `{:ok, :deleted}` or `{:error, :not_found}`.
   """
-
-  # ---------------------------------------------------------------------------
-  # Helpers
-  # ---------------------------------------------------------------------------
-
   @spec remove_instance(String.t()) :: {:ok, :deleted} | {:error, :not_found}
   def remove_instance(instance_id) do
     case ScxmlEngine.instance_pid(instance_id) do
@@ -144,12 +147,19 @@ defmodule ScxmlHttpEngine.Engine do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Helpers
+  # ---------------------------------------------------------------------------
+  @doc false
+
+  @spec snapshot_for(String.t(), pid()) :: snapshot()
   defp snapshot_for(instance_id, pid) do
     %{
       instance_id: instance_id,
       configuration: pid |> ScxmlEngine.active_configuration() |> MapSet.to_list(),
       datamodel: ScxmlEngine.datamodel(pid),
-      done: ScxmlEngine.done?(pid)
+      done: ScxmlEngine.done?(pid),
+      execution_status: ScxmlEngine.execution_status(pid)
     }
   end
 
