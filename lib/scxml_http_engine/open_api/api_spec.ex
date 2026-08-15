@@ -8,26 +8,23 @@ defmodule ScxmlHttpEngine.OpenApi.ApiSpec do
 
   @behaviour OpenApiSpex.OpenApi
 
-  alias OpenApiSpex.{Info, OpenApi, PathItem, Server}
+  alias OpenApiSpex.Info
+  alias OpenApiSpex.OpenApi
+  alias OpenApiSpex.PathItem
+  alias OpenApiSpex.Server
   alias ScxmlHttpEngine.Handlers
 
-  @impl OpenApiSpex.OpenApi
+  @impl OpenApi
   def spec do
-    %OpenApi{
+    OpenApiSpex.resolve_schema_modules(%OpenApi{
       info: %Info{
         title: "SCXML HTTP Engine",
         version: "0.1.0",
         description: "HTTP transport layer for the scxml-orchestrator runtime. Execute SCXML statecharts over HTTP."
       },
-      servers: [
-        %Server{
-          url: "http://localhost:4000",
-          description: "Local development server"
-        }
-      ],
+      servers: [%Server{url: "http://localhost:4000", description: "Local development server"}],
       paths: paths()
-    }
-    |> OpenApiSpex.resolve_schema_modules()
+    })
   end
 
   defp paths do

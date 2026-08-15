@@ -6,11 +6,11 @@ defmodule ScxmlHttpEngine.RouterTest do
   import Plug.Conn
   import Plug.Test
 
+  alias ScxmlHttpEngine.Handlers.Healthz
+  alias ScxmlHttpEngine.Handlers.Instances
+  alias ScxmlHttpEngine.Handlers.Statecharts
   alias ScxmlHttpEngine.Router
   alias ScxmlHttpEngine.TestSupport
-  alias ScxmlHttpEngine.Handlers.Healthz
-  alias ScxmlHttpEngine.Handlers.Statecharts
-  alias ScxmlHttpEngine.Handlers.Instances
 
   setup do
     instance_id = TestSupport.unique_id("router")
@@ -46,7 +46,13 @@ defmodule ScxmlHttpEngine.RouterTest do
       conn = call(:post, "/statecharts", body)
 
       assert conn.status == 201
-      assert %{"instance_id" => ^instance_id, "configuration" => ["red"], "execution_status" => "idle", "active_states" => [%{"id" => "red", "status" => "running", "type" => "atomic"}]} = json_body(conn)
+
+      assert %{
+               "instance_id" => ^instance_id,
+               "configuration" => ["red"],
+               "execution_status" => "idle",
+               "active_states" => [%{"id" => "red", "status" => "running", "type" => "atomic"}]
+             } = json_body(conn)
     end
 
     test "init/1 returns opts" do
@@ -158,7 +164,12 @@ defmodule ScxmlHttpEngine.RouterTest do
 
       conn = call(:post, "/instances/#{instance_id}/events", Jason.encode!(%{name: "next", data: %{}}))
       assert conn.status == 200
-      assert %{"configuration" => ["green"], "execution_status" => "running", "active_states" => [%{"id" => "green", "status" => "running", "type" => "atomic"}]} = json_body(conn)
+
+      assert %{
+               "configuration" => ["green"],
+               "execution_status" => "running",
+               "active_states" => [%{"id" => "green", "status" => "running", "type" => "atomic"}]
+             } = json_body(conn)
     end
 
     test "returns 400 for a malformed JSON body", %{instance_id: instance_id} do

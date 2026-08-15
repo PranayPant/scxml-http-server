@@ -3,11 +3,11 @@ defmodule ScxmlHttpEngine.Handlers.Instances do
   Handlers for the `/instances` resource.
 
   Routes:
-    - `POST /instances` — start an instance from a stored graph.
-    - `GET /instances/:id` — snapshot an instance.
-    - `POST /instances/:id/events` — send an event (synchronous step).
-    - `DELETE /instances/:id` — stop and remove an instance.
-    - `GET /instances` — enumerate all running instances.
+    - `POST /instances` â€” start an instance from a stored graph.
+    - `GET /instances/:id` â€” snapshot an instance.
+    - `POST /instances/:id/events` â€” send an event (synchronous step).
+    - `DELETE /instances/:id` â€” stop and remove an instance.
+    - `GET /instances` â€” enumerate all running instances.
   """
 
   @behaviour Plug
@@ -100,8 +100,7 @@ defmodule ScxmlHttpEngine.Handlers.Instances do
     %Operation{
       operationId: "InstancesController.create",
       summary: "Start an instance from a stored graph",
-      description:
-        "Start a new running instance from a previously stored graph, optionally with an initial datamodel.",
+      description: "Start a new running instance from a previously stored graph, optionally with an initial datamodel.",
       tags: ["Instances"],
       requestBody:
         Operation.request_body(
@@ -189,8 +188,7 @@ defmodule ScxmlHttpEngine.Handlers.Instances do
       description: "Returns a list of all currently running statechart instances.",
       tags: ["Instances"],
       responses: %{
-        200 =>
-          Operation.response("Running instances", "application/json", Schemas.InstanceList)
+        200 => Operation.response("Running instances", "application/json", Schemas.InstanceList)
       }
     }
   end

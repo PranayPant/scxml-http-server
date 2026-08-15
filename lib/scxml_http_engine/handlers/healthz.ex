@@ -1,6 +1,6 @@
 defmodule ScxmlHttpEngine.Handlers.Healthz do
   @moduledoc """
-  Handler for `GET /healthz` — liveness probe.
+  Handler for `GET /healthz` â€” liveness probe.
   """
 
   @behaviour Plug

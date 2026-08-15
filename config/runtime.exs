@@ -16,11 +16,10 @@ end
 # Erlang span tuples — the Tracer plug's structured "API Request Completed"
 # log lines are sufficient for local debugging.
 if config_env() == :prod do
-  config :opentelemetry, :processors, [
+  config :opentelemetry, :processors,
     otel_batch_processor: %{
       exporter: {:otel_exporter_stdout, []}
     }
-  ]
 else
   # Dev/test: no batch processor configured — spans are collected
   # internally by the SDK but not exported.  The Tracer plug's structured

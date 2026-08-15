@@ -121,9 +121,10 @@ defmodule ScxmlHttpEngine.Engine do
   """
   @spec list_instances() :: [snapshot()]
   def list_instances do
-    instances = for {id, pid} <- ScxmlEngine.instances() do
-      snapshot_for(id, pid)
-    end
+    instances =
+      for {id, pid} <- ScxmlEngine.instances() do
+        snapshot_for(id, pid)
+      end
 
     Logger.debug("list_instances: returning #{length(instances)} instance(s)")
     instances

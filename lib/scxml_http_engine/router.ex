@@ -17,45 +17,45 @@ defmodule ScxmlHttpEngine.Router do
   # Request-driven code reloader (dev-mode only — recompiles synced sources
   # before each request so Docker Compose Watch hot-reload works).
   if Mix.env() == :dev do
-    plug ScxmlHttpEngine.CodeReloader
+    plug(ScxmlHttpEngine.CodeReloader)
   end
 
-  plug Plug.RequestId
-  plug ScxmlHttpEngine.Tracer
+  plug(Plug.RequestId)
+  plug(ScxmlHttpEngine.Tracer)
 
-  plug OpenApiSpex.Plug.PutApiSpec, module: ScxmlHttpEngine.OpenApi.ApiSpec
+  plug(OpenApiSpex.Plug.PutApiSpec, module: ScxmlHttpEngine.OpenApi.ApiSpec)
   plug(:match)
   plug(:dispatch)
 
   # Liveness probe for load balancers / orchestrators.
-  get "/healthz", to: Handlers.Healthz, init_opts: []
+  get("/healthz", to: Handlers.Healthz, init_opts: [])
 
   # Register + start an instance from an uploaded AST JSON document.
   # Body: {"document": <AST JSON string>, "instance_id"?: "my-id"}
-  post "/statecharts", to: Handlers.Statecharts, init_opts: []
+  post("/statecharts", to: Handlers.Statecharts, init_opts: [])
 
   # Start an instance from a stored graph.
   # Body: {"graph_id": "g", "instance_id"?: "x", "initial_datamodel"?: {...}}
-  post "/instances", to: Handlers.Instances, init_opts: [action: :create]
+  post("/instances", to: Handlers.Instances, init_opts: [action: :create])
 
   # Snapshot an instance.
-  get "/instances/:id", to: Handlers.Instances, init_opts: [action: :show]
+  get("/instances/:id", to: Handlers.Instances, init_opts: [action: :show])
 
   # Send an event (synchronous "step") and return the settled state.
   # Body: {"name": "next", "data": {...}}
-  post "/instances/:id/events", to: Handlers.Instances, init_opts: [action: :event]
+  post("/instances/:id/events", to: Handlers.Instances, init_opts: [action: :event])
 
   # Stop and remove an instance.
-  delete "/instances/:id", to: Handlers.Instances, init_opts: [action: :delete]
+  delete("/instances/:id", to: Handlers.Instances, init_opts: [action: :delete])
 
   # Enumerate all running instances.
-  get "/instances", to: Handlers.Instances, init_opts: [action: :index]
+  get("/instances", to: Handlers.Instances, init_opts: [action: :index])
 
   # OpenAPI spec endpoint
-  get "/openapi", to: OpenApiSpex.Plug.RenderSpec, init_opts: []
+  get("/openapi", to: OpenApiSpex.Plug.RenderSpec, init_opts: [])
 
   # Swagger UI
-  get "/swaggerui", to: OpenApiSpex.Plug.SwaggerUI, init_opts: [path: "/openapi"]
+  get("/swaggerui", to: OpenApiSpex.Plug.SwaggerUI, init_opts: [path: "/openapi"])
 
   @json_error_body Jason.encode!(%{error: "not found"})
 

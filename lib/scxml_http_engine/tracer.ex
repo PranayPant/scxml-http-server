@@ -4,9 +4,9 @@ defmodule ScxmlHttpEngine.Tracer do
   dictionary and registers a `register_before_send` callback for three-level
   request/response tracing:
 
-    * `:error` — 5xx responses
-    * `:info`  — 2xx / 4xx responses (suppressed for health-check/API-doc paths)
-    * `:debug` — intermediate engine steps logged by `ScxmlHttpEngine.Engine`
+    * `:error` â€” 5xx responses
+    * `:info`  â€” 2xx / 4xx responses (suppressed for health-check/API-doc paths)
+    * `:debug` â€” intermediate engine steps logged by `ScxmlHttpEngine.Engine`
 
   ## Pipeline placement
 
@@ -22,6 +22,7 @@ defmodule ScxmlHttpEngine.Tracer do
   """
 
   import Plug.Conn
+
   require Logger
 
   @quiet_prefixes ["/healthz", "/openapi", "/swaggerui"]
@@ -65,7 +66,7 @@ defmodule ScxmlHttpEngine.Tracer do
       status = callback_conn.status
 
       cond do
-        # 5xx → :error level
+        # 5xx â†’ :error level
         status >= 500 ->
           Logger.error("API Request Failed",
             status: status,
@@ -73,9 +74,9 @@ defmodule ScxmlHttpEngine.Tracer do
             path: callback_conn.request_path
           )
 
-        # 2xx / 4xx → :info level (unless this is a quiet route)
+        # 2xx / 4xx â†’ :info level (unless this is a quiet route)
         status < 500 ->
-          unless is_quiet_route do
+          if !is_quiet_route do
             Logger.info("API Request Completed",
               status: status,
               method: callback_conn.method,

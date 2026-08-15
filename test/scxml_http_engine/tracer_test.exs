@@ -1,8 +1,9 @@
 defmodule ScxmlHttpEngine.TracerTest do
   use ExUnit.Case, async: true
-  import Plug.Test
-  import Plug.Conn
+
   import ExUnit.CaptureLog
+  import Plug.Conn
+  import Plug.Test
 
   alias ScxmlHttpEngine.Tracer
 
@@ -34,7 +35,8 @@ defmodule ScxmlHttpEngine.TracerTest do
 
   describe "quiet path suppression" do
     test "sets process level to warning for /healthz" do
-      conn(:get, "/healthz")
+      :get
+      |> conn("/healthz")
       |> Tracer.call([])
       |> send_resp(200, "ok")
 
@@ -42,7 +44,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     end
 
     test "sets process level to warning for /openapi" do
-      conn(:get, "/openapi")
+      :get
+      |> conn("/openapi")
       |> Tracer.call([])
       |> send_resp(200, "ok")
 
@@ -50,7 +53,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     end
 
     test "sets process level to warning for /swaggerui with trailing slash" do
-      conn(:get, "/swaggerui/")
+      :get
+      |> conn("/swaggerui/")
       |> Tracer.call([])
       |> send_resp(200, "ok")
 
@@ -58,7 +62,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     end
 
     test "sets process level to warning for /swaggerui/index.html" do
-      conn(:get, "/swaggerui/index.html")
+      :get
+      |> conn("/swaggerui/index.html")
       |> Tracer.call([])
       |> send_resp(200, "ok")
 
@@ -66,7 +71,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     end
 
     test "does not suppress normal routes" do
-      conn(:get, "/api/v1/engine/run")
+      :get
+      |> conn("/api/v1/engine/run")
       |> Tracer.call([])
       |> send_resp(200, "ok")
 
@@ -78,7 +84,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     test "logs info for 2xx responses" do
       log_output =
         capture_log(fn ->
-          conn(:get, "/api/v1/engine/run")
+          :get
+          |> conn("/api/v1/engine/run")
           |> Tracer.call([])
           |> send_resp(200, "OK")
         end)
@@ -90,7 +97,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     test "logs info for 4xx responses" do
       log_output =
         capture_log(fn ->
-          conn(:get, "/api/v1/engine/run")
+          :get
+          |> conn("/api/v1/engine/run")
           |> Tracer.call([])
           |> send_resp(404, "Not Found")
         end)
@@ -102,7 +110,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     test "logs error for 5xx responses" do
       log_output =
         capture_log(fn ->
-          conn(:post, "/api/v1/engine/run")
+          :post
+          |> conn("/api/v1/engine/run")
           |> Tracer.call([])
           |> send_resp(500, "Internal Server Error")
         end)
@@ -114,7 +123,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     test "does not log info for 2xx responses on quiet paths" do
       log_output =
         capture_log(fn ->
-          conn(:get, "/healthz")
+          :get
+          |> conn("/healthz")
           |> Tracer.call([])
           |> send_resp(200, "ok")
         end)
@@ -125,7 +135,8 @@ defmodule ScxmlHttpEngine.TracerTest do
     test "does log error for 5xx responses even on quiet paths" do
       log_output =
         capture_log(fn ->
-          conn(:get, "/healthz")
+          :get
+          |> conn("/healthz")
           |> Tracer.call([])
           |> send_resp(500, "fail")
         end)

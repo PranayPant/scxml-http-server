@@ -10,6 +10,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule Error do
     @moduledoc "Error response body."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "Error",
       description: "An error response",
@@ -24,6 +25,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule EventRequest do
     @moduledoc "Request body for sending an event to an instance."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "EventRequest",
       description: "Event to send to a statechart instance",
@@ -46,6 +48,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule StateInfo do
     @moduledoc "Execution status of a single active state."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "StateInfo",
       description: "A state's execution status",
@@ -70,6 +73,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule Snapshot do
     @moduledoc "Snapshot of a statechart instance."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "Snapshot",
       description: "Current state of a statechart instance",
@@ -108,6 +112,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule InstanceList do
     @moduledoc "List of running instance snapshots."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "InstanceList",
       description: "List of running instances",
@@ -119,6 +124,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule RegisterDocumentRequest do
     @moduledoc "Request body for registering a new statechart document."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "RegisterDocumentRequest",
       description: "Upload a statechart document and optionally start an instance",
@@ -141,6 +147,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule StartInstanceRequest do
     @moduledoc "Request body for starting an instance from a stored graph."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "StartInstanceRequest",
       description: "Start a new instance from a previously stored graph",
@@ -165,6 +172,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
   defmodule DeletedResponse do
     @moduledoc "Response after deleting an instance."
     require OpenApiSpex
+
     OpenApiSpex.schema(%{
       title: "DeletedResponse",
       description: "Confirmation that an instance was deleted",

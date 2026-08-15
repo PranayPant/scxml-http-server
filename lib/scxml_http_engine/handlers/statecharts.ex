@@ -3,17 +3,17 @@ defmodule ScxmlHttpEngine.Handlers.Statecharts do
   Handlers for the `/statecharts` resource.
 
   Routes:
-    - `POST /statecharts` — register and start an instance from an uploaded AST JSON document.
+    - `POST /statecharts` â€” register and start an instance from an uploaded AST JSON document.
   """
 
   @behaviour Plug
-
-  require Logger
 
   alias OpenApiSpex.Operation
   alias ScxmlHttpEngine.Engine
   alias ScxmlHttpEngine.Error
   alias ScxmlHttpEngine.OpenApi.Schemas
+
+  require Logger
 
   @impl Plug
   def init(opts), do: opts
@@ -42,9 +42,11 @@ defmodule ScxmlHttpEngine.Handlers.Statecharts do
     %Operation{
       operationId: "StatechartsController.create",
       summary: "Register and start a statechart",
-      description:
-        "Upload an SCXML AST JSON document, compile it, store the graph, and start a running instance.",
+      description: "Upload an SCXML AST JSON document, compile it, store the graph, and start a running instance.",
       tags: ["Statecharts"],
+      # ---------------------------------------------------------------------------
+      # Helpers (mirrored from Router)
+      # ---------------------------------------------------------------------------
       requestBody:
         Operation.request_body(
           "SCXML document to register",
@@ -57,10 +59,6 @@ defmodule ScxmlHttpEngine.Handlers.Statecharts do
       }
     }
   end
-
-  # ---------------------------------------------------------------------------
-  # Helpers (mirrored from Router)
-  # ---------------------------------------------------------------------------
 
   defp read_json(conn) do
     with {:ok, body, _} <- Plug.Conn.read_body(conn, length: 1_000_000),
