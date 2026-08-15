@@ -22,5 +22,5 @@ pre-commit:
 pre-push:
   parallel: true
   commands:
-    coveralls:
-      run: mix coveralls
+    coverage:
+      run: mix test --cover
