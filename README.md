@@ -1,35 +1,112 @@
 # scxml-http-engine
 
-> How an HTTP service would consume the **`scxml-orchestrator`** library to
-> actually execute SCXML statecharts.
+> HTTP transport layer for the **`scxml-orchestrator`** runtime. Execute SCXML
+> statecharts over HTTP with a built-in OpenAPI spec and Swagger UI.
 
-This document is written from the perspective of a **separate, consumer
-project** — an HTTP engine — that depends on the
-[`scxml-orchestrator`](https://github.com/PranayPant/scxml-orchestrator)
-library. It does **not** modify the library; it layers a transport on top of
-`ScxmlEngine`'s public API. The library's own README explicitly scopes out
-HTTP/WebSocket/gRPC transports — this repo is where that transport lives.
+Layers a Plug/Cowboy transport on top of
+[`scxml-orchestrator`](https://github.com/PranayPant/scxml-orchestrator)'s
+public API. The library's own README explicitly scopes out HTTP/WebSocket/gRPC
+transports — this repo is where that transport lives.
 
 ---
 
-## 1. The mental model
+## 1. Quick start
+
+```bash
+# Build and run with Docker
+docker build -t scxml-http-engine .
+docker run --rm -p 4000:4000 -e SCXML_HTTP_ENGINE_PORT=4000 scxml-http-engine
+
+# Try it
+curl http://localhost:4000/healthz          # → "ok"
+curl http://localhost:4000/openapi           # → OpenAPI 3.0 spec
+open http://localhost:4000/swaggerui         # → Swagger UI
+```
+
+---
+
+## 1.5. Developer experience — hot reloading
+
+During development, the app uses **Docker Compose Watch** with a **request-driven
+compilation** strategy for instant code reload without restarting the container.
+
+```bash
+docker compose up --watch
+```
+
+This syncs your `./lib` and `./config` directories into the running container
+and triggers a full image rebuild only when `mix.exs` or `mix.lock` change. A
+`CodeReloader` plug recompiles freshly synced `.ex` files on every HTTP request
+in `:dev` mode, so you just refresh your browser or re-curl to pick up changes.
+
+| File                                     | Role                                              |
+| ---------------------------------------- | ------------------------------------------------- |
+| `lib/scxml_http_engine/code_reloader.ex` | `Plug` that runs `compile.elixir` on each request |
+| `Dockerfile` (stage `dev`)               | `MIX_ENV=dev`, `CMD ["mix", "run", "--no-halt"]`  |
+| `docker-compose.yml`                     | `target: dev`, `develop.watch` sync/rebuild rules |
+
+---
+
+## 2. Endpoint surface
+
+| Method   | Path                    | Description                                                          | Request body                                                              |
+| -------- | ----------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `GET`    | `/healthz`              | Liveness probe                                                       | —                                                                         |
+| `POST`   | `/statecharts`          | Upload AST JSON, store graph, start an instance                      | `{"document": "<SCXML AST JSON>", "instance_id"?: "..."}`                 |
+| `POST`   | `/instances`            | Start an instance from a stored graph                                | `{"graph_id": "...", "instance_id"?: "...", "initial_datamodel"?: {...}}` |
+| `GET`    | `/instances/:id`        | Snapshot (configuration, datamodel, active_states, execution_status) | —                                                                         |
+| `POST`   | `/instances/:id/events` | Send an event, return settled state                                  | `{"name": "next", "data"?: {...}}`                                        |
+| `DELETE` | `/instances/:id`        | Stop and remove an instance                                          | —                                                                         |
+| `GET`    | `/instances`            | Enumerate all running instances                                      | —                                                                         |
+| `GET`    | `/openapi`              | OpenAPI 3.0 specification (JSON)                                     | —                                                                         |
+| `GET`    | `/swaggerui`            | Swagger UI documentation browser                                     | —                                                                         |
+
+The full schema is available interactively at `/swaggerui` or as a raw JSON
+spec at `/openapi`.
+
+---
+
+## 3. Project structure
+
+```
+lib/
+├── scxml_http_engine.ex                    # top-level module alias
+├── scxml_http_engine/
+│   ├── application.ex                      # OTP application (Plug.Cowboy child)
+│   ├── router.ex                           # Plug.Router — route matching + delegation
+│   ├── engine.ex                           # Facade over ScxmlEngine public API
+│   ├── error.ex                            # {:ok,_}/{:error,_} → HTTP response helpers
+│   ├── handlers/
+│   │   ├── healthz.ex                      # GET /healthz
+│   │   ├── statecharts.ex                  # POST /statecharts
+│   │   └── instances.ex                    # all /instances routes (CRUD + event)
+│   └── open_api/
+│       ├── api_spec.ex                     # OpenApiSpex.OpenApi behaviour
+│       └── schemas.ex                      # Request/response schema definitions
+```
+
+### Architecture overview
+
+```
+ HTTP request ─► Plug.Router ─► Handler modules ─► ScxmlHttpEngine.Engine ─► ScxmlEngine (lib)
+                    │                                                              │
+                    ├─ PutApiSpec (OpenAPI)                                         ├─ compiled graph  (:persistent_term)
+                    ├─ /openapi → RenderSpec                                        ├─ Instance (GenServer)
+                    └─ /swaggerui → SwaggerUI                                       └─ Registry + DynamicSupervisor
+```
+
+---
+
+## 4. The mental model
 
 The library is a **library-first, in-process statechart runtime** built on OTP:
 
-```
- HTTP request ─► Phoenix/Plug router ─► ScxmlHttpEngine ─► ScxmlEngine (lib)
-                                                  │
-                                                  ├─ compiled graph  (:persistent_term)
-                                                  ├─ Instance (GenServer) = one running statechart
-                                                  └─ Registry (instance_id → pid) + DynamicSupervisor
-```
-
-| Library concept | BEAM reality | Lifetime |
-| --- | --- | --- |
+| Library concept                 | BEAM reality                                    | Lifetime                                                 |
+| ------------------------------- | ----------------------------------------------- | -------------------------------------------------------- |
 | **Graph** (compiled statechart) | Stored in `:persistent_term` under a `graph_id` | Long-lived, read-only, shared zero-copy across instances |
-| **Instance** | A `ScxmlEngine.Instance` `GenServer` | One per running statechart invocation |
-| **External event queue** | The GenServer's mailbox (`GenServer.call`) | Per instance |
-| **Registry** | `ScxmlEngine.Registry` maps `instance_id → pid` | Process-wide |
+| **Instance**                    | A `ScxmlEngine.Instance` `GenServer`            | One per running statechart invocation                    |
+| **External event queue**        | The GenServer's mailbox (`GenServer.call`)      | Per instance                                             |
+| **Registry**                    | `ScxmlEngine.Registry` maps `instance_id → pid` | Process-wide                                             |
 
 Key design consequences:
 
@@ -43,16 +120,18 @@ Key design consequences:
 
 ---
 
-## 2. Deps and supervision
+## 5. Deps and supervision
 
-In your `mix.exs`:
+The engine depends on `scxml-orchestrator`, `plug_cowboy`, `jason`, and
+`open_api_spex`:
 
 ```elixir
 defp deps do
   [
-    {:scxml_orchestrator, path: "../scxml-orchestrator"},  # or a hex/git dep
+    {:scxml_orchestrator, path: "../scxml-orchestrator"},  # or hex/git
     {:jason, "~> 1.4"},
-    {:plug_cowboy, "~> 2.7"}   # or bandit + plug
+    {:plug_cowboy, "~> 2.7"},
+    {:open_api_spex, "~> 3.19"}
   ]
 end
 ```
@@ -64,13 +143,15 @@ the release boots (and `ScxmlOrchestrator.Application` declares
 `mod: {ScxmlOrchestrator.Application, []}`, so its supervisor is started by
 OTP for you).
 
-Your own supervision tree only needs your web layer:
+Your own supervision tree only needs the web layer:
 
 ```elixir
 # lib/scxml_http_engine/application.ex
 def start(_type, _args) do
+  port = Application.get_env(:scxml_http_engine, ScxmlHttpEngine.Router, [])[:port] || 4000
+
   children = [
-    ScxmlHttpEngine.Router            # your Plug router (cowboy/bandit)
+    {Plug.Cowboy, scheme: :http, plug: ScxmlHttpEngine.Router, options: [port: port]}
   ]
 
   opts = [strategy: :one_for_one, name: ScxmlHttpEngine.Supervisor]
@@ -85,7 +166,7 @@ end
 
 ---
 
-## 3. Public API you'll drive
+## 6. Public API you'll drive
 
 All calls are synchronous ("step") semantics — `send_event/3` returns once the
 full macrostep has settled, so a single HTTP request yields a deterministic
@@ -114,20 +195,20 @@ done   = ScxmlEngine.done?(pid)                  # true when finished
 {:ok, pid} = ScxmlEngine.start_instance(graph_id: "traffic", instance_id: "x")
 ```
 
-| Function | HTTP role |
-| --- | --- |
-| `ScxmlEngine.run/2` | `POST /statecharts` (register + start) |
-| `ScxmlEngine.start_instance/1` | start an instance against a pre-stored graph |
-| `ScxmlEngine.store/2` | upload / pre-compile a statechart definition |
-| `ScxmlEngine.send_event_to/3` | `POST /instances/:id/events` |
-| `ScxmlEngine.active_configuration/1` | `GET /instances/:id` snapshot |
-| `ScxmlEngine.datamodel/1` | inspect datamodel |
-| `ScxmlEngine.done?/1` | terminal-state detection |
-| `ScxmlEngine.instance_pid/1`, `instances/0` | routing / list endpoints |
+| Function                                    | HTTP role                                    |
+| ------------------------------------------- | -------------------------------------------- |
+| `ScxmlEngine.run/2`                         | `POST /statecharts` (register + start)       |
+| `ScxmlEngine.start_instance/1`              | start an instance against a pre-stored graph |
+| `ScxmlEngine.store/2`                       | upload / pre-compile a statechart definition |
+| `ScxmlEngine.send_event_to/3`               | `POST /instances/:id/events`                 |
+| `ScxmlEngine.active_configuration/1`        | `GET /instances/:id` snapshot                |
+| `ScxmlEngine.datamodel/1`                   | inspect datamodel                            |
+| `ScxmlEngine.done?/1`                       | terminal-state detection                     |
+| `ScxmlEngine.instance_pid/1`, `instances/0` | routing / list endpoints                     |
 
 ---
 
-## 4. Serialization notes (what the wire format is NOT)
+## 7. Serialization notes (what the wire format is NOT)
 
 The library consumes the **parser AST JSON**, not SCXML source. Events and
 datamodel values are regular Elixir terms; over HTTP you'll `Jason.decode!`/
@@ -144,95 +225,7 @@ datamodel values are regular Elixir terms; over HTTP you'll `Jason.decode!`/
 
 ---
 
-## 5. Reference: a minimal Plug router
-
-```elixir
-defmodule ScxmlHttpEngine.Router do
-  use Plug.Router
-  plug :match
-  plug :dispatch
-
-  # Register + start an instance from an uploaded AST JSON document.
-  # Body: {"document": <AST JSON object>, "instance_id": "my-id" (optional)}
-  post "/statecharts" do
-    with {:ok, body, _} <- read_body(conn),
-         {:ok, instance_id} <- start(body) do
-      pid = fetch_pid!(instance_id)
-      send_resp(conn, 201, Jason.encode!(%{instance_id: instance_id,
-                                            configuration: ScxmlEngine.active_configuration(pid) |> MapSet.to_list()}))
-    else
-      {:error, reason} -> send_resp(conn, 400, Jason.encode!(%{error: inspect(reason)}))
-    end
-  end
-
-  # Send an event (synchronous "step").
-  post "/instances/:id/events" do
-    with {:ok, body, _} <- read_body(conn),
-         %{"name" => name, "data" => data} <- Jason.decode!(body),
-         :ok <- ScxmlEngine.send_event_to(id, name, data || %{}) do
-      pid = fetch_pid!(id)
-      send_resp(conn, 200, Jason.encode!(%{configuration: ScxmlEngine.active_configuration(pid) |> MapSet.to_list(),
-                                            datamodel: ScxmlEngine.datamodel(pid),
-                                            done: ScxmlEngine.done?(pid)}))
-    else
-      _ -> send_resp(conn, 404, Jason.encode!(%{error: "instance not found or bad event"}))
-    end
-  end
-
-  # Snapshot an instance.
-  get "/instances/:id" do
-    case ScxmlEngine.instance_pid(id) do
-      {:ok, pid} ->
-        send_resp(conn, 200, Jason.encode!(%{configuration: ScxmlEngine.active_configuration(pid) |> MapSet.to_list(),
-                                             datamodel: ScxmlEngine.datamodel(pid),
-                                             done: ScxmlEngine.done?(pid)}))
-      _ ->
-        send_resp(conn, 404, Jason.encode!(%{error: "instance not found"}))
-    end
-  end
-
-  match _ do
-    send_resp(conn, 404, "not found")
-  end
-
-  # ---- Helpers ---------------------------------------------------------
-
-  # Parse the body, extract the embedded AST JSON document and an optional
-  # instance_id, then load+store+start the instance via the library.
-  # (instance_id is optional — the library falls back to the graph id, which
-  # we recover here by matching the started pid against ScxmlEngine.instances/0.)
-  defp start(body) do
-    decoded = Jason.decode!(body)
-    doc = Map.fetch!(decoded, "document")
-    requested_id = Map.get(decoded, "instance_id")
-
-    with {:ok, pid} <- ScxmlEngine.run(Jason.encode!(doc), instance_id: requested_id) do
-      resolved_id = requested_id || instance_id_for_pid(pid)
-      {:ok, resolved_id}
-    end
-  end
-
-  defp instance_id_for_pid(pid) do
-    Enum.find_value(ScxmlEngine.instances(), fn {id, p} ->
-      if p == pid, do: id
-    end)
-  end
-
-  defp fetch_pid!(instance_id) do
-    {:ok, pid} = ScxmlEngine.instance_pid(instance_id)
-    pid
-  end
-end
-```
-
-> **Note on concurrency:** each `send_event_to` is a blocking `GenServer.call`
-> that does the work on the instance process. A slow statechart (or lots of
-> `raise`-internal events) will hold that one instance's mailbox but not the
-> whole server — other instances keep stepping independently.
-
----
-
-## 6. Lifecycle & durability (doing it "for real")
+## 8. Lifecycle & durability (doing it "for real")
 
 The library is **in-memory**. If your HTTP engine must survive reboots or
 scale horizontally, treat this as a first-class design concern:
@@ -257,7 +250,7 @@ scale horizontally, treat this as a first-class design concern:
 
 ---
 
-## 7. Distribution (optional)
+## 9. Distribution (optional)
 
 For horizontal scale beyond one node:
 
@@ -266,17 +259,5 @@ For horizontal scale beyond one node:
   `send_event_to/3` routing layer is the seam to make node-aware.
 
 ---
-
-## 8. Suggested endpoint surface
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `POST` | `/statecharts` | Upload AST JSON, store graph, start an instance |
-| `GET` | `/statecharts/:graphId` | List/describe a stored graph |
-| `POST` | `/instances` | Start a new instance from a stored `graphId` |
-| `GET` | `/instances/:id` | Snapshot (configuration, datamodel, done?) |
-| `POST` | `/instances/:id/events` | Send an event, return settled state |
-| `DELETE` | `/instances/:id` | Stop and remove an instance |
-| `GET` | `/instances` | Enumerate running instances |
 
 Happy statecharting. 🤖

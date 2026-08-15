@@ -1,0 +1,26 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "4000:4000"
+    environment:
+      - MIX_ENV=dev
+      - SCXML_HTTP_ENGINE_PORT=4000
+    develop:
+      watch:
+        # Sync Elixir source and config files instantly without rebuilding
+        - action: sync
+          path: ./lib
+          target: /app/lib
+        - action: sync
+          path: ./config
+          target: /app/config
+
+        # Rebuild the entire image if dependencies change
+        - action: rebuild
+          path: mix.exs
+        - action: rebuild
+          path: mix.lock

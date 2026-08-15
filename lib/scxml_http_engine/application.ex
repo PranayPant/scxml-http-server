@@ -5,8 +5,13 @@ defmodule ScxmlHttpEngine.Application do
 
   use Application
 
+  require Logger
+
   @impl true
   def start(_type, _args) do
+    # Initialise the automated Cowboy network-level tracing spans.
+    :opentelemetry_cowboy.setup()
+
     port = Application.get_env(:scxml_http_engine, ScxmlHttpEngine.Router, [])[:port] || 4000
 
     children = [
@@ -16,9 +21,15 @@ defmodule ScxmlHttpEngine.Application do
       {Plug.Cowboy, scheme: :http, plug: ScxmlHttpEngine.Router, options: [port: port]}
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: ScxmlHttpEngine.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        Logger.info("scxml-http-engine started on port #{port}")
+        {:ok, pid}
+
+      error ->
+        error
+    end
   end
 end

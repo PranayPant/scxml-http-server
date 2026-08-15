@@ -1,11 +1,10 @@
-# Lefthook configuration — pre-commit quality pipeline.
+# Lefthook configuration — pre-commit quality pipeline + pre-push coverage.
 # Docs: https://github.com/evilmartians/lefthook
 #
 # Run `lefthook install` after editing this file to (re)write the git hooks.
 #
-# `coverage` runs the full test suite under --cover AND enforces the 100%
-# threshold, so a separate `mix test --stale` stage is redundant — and running
-# two `mix test`s in parallel over the same _build dir makes coverage flaky.
+# Pre-commit runs fast checks (format, credo, stale tests). Coverage is
+# deferred to pre-push where the full suite runs under `mix coveralls`.
 
 pre-commit:
   parallel: true
@@ -16,6 +15,12 @@ pre-commit:
     credo-linter:
       glob: "*.{ex,exs}"
       run: mix credo --strict
-    coverage:
+    test-suite:
       glob: "*.{ex,exs}"
-      run: mix test --cover
+      run: mix test --stale
+
+pre-push:
+  parallel: true
+  commands:
+    coveralls:
+      run: mix coveralls

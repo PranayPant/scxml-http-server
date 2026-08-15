@@ -17,6 +17,8 @@ defmodule ScxmlHttpEngine.EngineTest do
       assert snapshot.instance_id == instance_id
       assert snapshot.configuration == ["red"]
       assert snapshot.done == false
+      assert snapshot.execution_status == :idle
+      assert snapshot.active_states == [%{id: "red", status: :running, type: :atomic}]
       assert %{"color" => "red"} in [snapshot.datamodel["data"]]
     end
 
@@ -56,6 +58,8 @@ defmodule ScxmlHttpEngine.EngineTest do
 
       assert {:ok, snapshot} = Engine.step(instance_id, "next", %{})
       assert snapshot.configuration == ["green"]
+      assert snapshot.execution_status == :running
+      assert snapshot.active_states == [%{id: "green", status: :running, type: :atomic}]
     end
 
     test "defaults a nil data payload to an empty map", %{instance_id: instance_id} do

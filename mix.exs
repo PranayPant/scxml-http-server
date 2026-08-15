@@ -21,7 +21,12 @@ defmodule ScxmlHttpEngine.MixProject do
   defp ignored_modules do
     [
       ScxmlHttpEngine.Application,
-      ScxmlHttpEngine
+      ScxmlHttpEngine,
+      ScxmlHttpEngine.Tracer,
+      # Dev-only infrastructure plug — its `call/2` only runs when
+      # `Mix.env() == :dev`, so tests in the `:test` environment cannot
+      # exercise it.
+      ScxmlHttpEngine.CodeReloader
     ]
   end
 
@@ -38,7 +43,7 @@ defmodule ScxmlHttpEngine.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :opentelemetry],
       mod: {ScxmlHttpEngine.Application, []}
     ]
   end
@@ -57,6 +62,11 @@ defmodule ScxmlHttpEngine.MixProject do
       scxml_orchestrator_dep(),
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7"},
+      {:open_api_spex, "~> 3.19"},
+      {:logger_json, "~> 7.0"},
+      {:opentelemetry, "~> 1.3"},
+      {:opentelemetry_api, "~> 1.3"},
+      {:opentelemetry_cowboy, "~> 1.0"},
       # Code-quality toolchain (dev/test only) — see lefthook.yml.
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false}
@@ -67,7 +77,7 @@ defmodule ScxmlHttpEngine.MixProject do
     if File.dir?("../scxml-orchestrator") do
       {:scxml_orchestrator, path: "../scxml-orchestrator"}
     else
-      {:scxml_orchestrator, git: "https://github.com/PranayPant/scxml-orchestrator.git"}
+      {:scxml_orchestrator, git: "https://github.com/PranayPant/scxml-orchestrator.git", branch: "main"}
     end
   end
 end

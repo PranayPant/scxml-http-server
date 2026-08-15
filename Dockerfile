@@ -53,6 +53,21 @@ COPY --chown=scxml_engine:scxml_engine .formatter.exs ./.formatter.exs
 ENV MIX_ENV=prod
 RUN mix release scxml_http_engine
 
+# --- Dev target (hot-reload with Docker Compose Watch) ---------------------
+FROM builder AS dev
+
+# Switch to dev mode so the CodeReloader plug triggers recompilation.
+ENV MIX_ENV=dev
+
+# Fetch all deps (including dev/test groups) and recompile.
+RUN mix deps.get && mix compile
+
+EXPOSE 4000
+
+# Keep the BEAM VM alive — the CodeReloader plug recompiles synced sources
+# on each request so there is no need to restart the container.
+CMD ["mix", "run", "--no-halt"]
+
 # --- Runtime ---------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
