@@ -20,6 +20,11 @@ defmodule ScxmlHttpEngine.Router do
     plug(ScxmlHttpEngine.CodeReloader)
   end
 
+  plug(CORSPlug,
+    origin: "*",
+    headers: ["accept", "authorization", "content-type", "origin", "x-requested-with", "traceparent"]
+  )
+
   plug(Plug.RequestId)
   plug(ScxmlHttpEngine.Tracer)
 
