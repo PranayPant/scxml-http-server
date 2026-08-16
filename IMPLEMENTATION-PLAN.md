@@ -4,10 +4,10 @@ This document plans the HTTP engine implementation once the scaffolding +
 pre-commit pipeline are in place. It drives the `ScxmlHttpEngine` transport on
 top of the `scxml-orchestrator` library's `ScxmlEngine` public API.
 
-> **STATUS: end-to-end implementation + Docker build complete (2026-08-11).**
-> The endpoints below are implemented and verified (see §8). Remaining
-> future work: durability/snapshot persistence, Horde distribution, and the
-> test suites (intentionally still deferred).
+> **STATUS: full implementation + tests + CI pipeline complete (2026-08-15).**
+> The endpoints below are implemented and verified (see §8). All contract-layer
+> tests are written at 100% coverage. Remaining future work: durability/snapshot
+> persistence and Horde distribution.
 
 ## 0. Confirmed library API (from `scxml-orchestrator` `lib/scxml_engine.ex`)
 
@@ -29,10 +29,19 @@ top of the `scxml-orchestrator` library's `ScxmlEngine` public API.
 
 ```
 lib/scxml_http_engine/
-  application.ex       # (exists) starts Plugin.Cowboy + Router
-  router.ex            # (exists stub) route dispatch — will gain endpoints
-  engine.ex            # NEW: thin facade over ScxmlEngine (serialization, errors)
-  instance.ex          # NEW (optional): per-instance snapshot helpers
+  application.ex       # starts Plug.Cowboy + Router
+  router.ex            # route dispatch — wired to handler modules
+  engine.ex            # thin facade over ScxmlEngine (serialization, errors)
+  error.ex             # maps Engine results to HTTP status + JSON body
+  tracer.ex            # custom tracing plug: OTel metadata, request logging, quiet paths
+  code_reloader.ex     # dev-only request-driven compilation (ignored from coverage)
+  handlers/
+    healthz.ex         # GET /healthz
+    instances.ex       # GET/POST/DELETE /instances, POST /instances/:id/events
+    statecharts.ex     # POST /statecharts
+  open_api/
+    api_spec.ex        # OpenAPI 3.0 spec (OpenApiSpex)
+    schemas.ex         # nested schema modules: Error, EventRequest, Snapshot, etc.
 ```
 
 Keep the router thin: route matching + plug boilerplate lives in `router.ex`;
@@ -86,42 +95,50 @@ datamodel, graph_id}` after each macrostep; rehydrate on boot via
    `run/2` with `initial_datamodel`. Requires storing the original AST JSON.
 6. **Distribution (optional later phase)** — swap Registry/DynamicSupervisor for
    Horde; make `send_event_to` node-aware at the routing seam.
-7. **Tests (deferred by user)** — add `mix test --stale` + `mix test --cover`
-   stages to `lefthook.yml`, then write ExUnit+Plug.Test suites.
+7. **Tests** — add `mix test --stale` (pre-commit) + `mix test --cover` (pre-push)
+   stages to `lefthook.yml`, then write ExUnit+Plug.Test suites for all handlers
+   and the engine/error facades. 57 tests, 100% contract-layer coverage.
 
-## 6. Known library gaps to watch
+## 6. Known library gaps (resolved)
 
-- **No teardown API observed** (only `start_instance`, no `stop_instance`). The
-  `DELETE` endpoint may need to call the instance's `GenServer.stop/1` directly
-  or rely on `DynamicSupervisor` termination. Verify in the library before
-  implementing.
-- **instance_id resolution**: README notes id defaults to graph id when omitted.
-  The `run/2` returns only a pid; to recover the resolved id, match the pid
-  against `instances/0` (as README's `instance_id_for_pid/1` does) or extend the
-  facade to capture it at registration time.
+- **No teardown API** → `GenServer.stop(pid)` works; the library's registry
+  entry is keyed to the instance process, so it auto-unregisters on termination.
+  (Resolved — see §8 Notes.)
+- **instance_id resolution** → when omitted, `register_and_start` recovers it by
+  matching the pid against `instances/0`. (Resolved — see §8 Notes.)
 - **Graph description** (`GET /statecharts/:graphId`) has no direct "describe"
   call — may need to keep a side-table of `graph_id → AST` (or re-parse) to
-  return meaningful metadata.
+  return meaningful metadata. (Still deferred.)
 
 ## 7. Out of scope (this milestone)
 
-- Tests (deferred; see note).
 - Auth/rate-limiting.
 - Persistence & Horde (deferred phases §5.5–5.6).
 - `GET /statecharts/:graphId` (graph describe) — needs a side-table; deferred.
 
-## 8. Shipped & verified (2026-08-11)
+## 8. Shipped & verified (2026-08-15)
 
-**Modules added**
+### Modules
 
 - `lib/scxml_http_engine/engine.ex` — facade over `ScxmlEngine`
   (`register_and_start/2`, `start_instance/3`, `step/3`, `snapshot/1`,
   `list_instances/0`, `remove_instance/1`).
 - `lib/scxml_http_engine/error.ex` — `to_json/1` maps `Engine` results to
   `{status, body}` (`200`/`201`/`400`/`404`).
-- `lib/scxml_http_engine/router.ex` — routes wired to the facade.
+- `lib/scxml_http_engine/router.ex` — routes wired to handler modules.
+- `lib/scxml_http_engine/tracer.ex` — custom tracing plug: injects `request_id`
+  - OTel metadata, logs request completion, suppresses health check noise.
+- `lib/scxml_http_engine/code_reloader.ex` — dev-only request-driven compilation.
+- `lib/scxml_http_engine/handlers/healthz.ex` — `init/1`, `call/2` for `GET /healthz`.
+- `lib/scxml_http_engine/handlers/instances.ex` — `init/1`, `call/2` for all
+  instance CRUD routes.
+- `lib/scxml_http_engine/handlers/statecharts.ex` — `init/1`, `call/2` for `POST /statecharts`.
+- `lib/scxml_http_engine/open_api/api_spec.ex` — OpenAPI 3.0 spec using `OpenApiSpex`.
+- `lib/scxml_http_engine/open_api/schemas.ex` — nested schema modules (`Error`,
+  `EventRequest`, `StateInfo`, `Snapshot`, `InstanceList`,
+  `RegisterDocumentRequest`, `StartInstanceRequest`, `DeletedResponse`).
 
-**Endpoints verified via curl against a running server and a running container**
+### Endpoints verified via curl against a running server and container
 
 | Method/Path                  | Result                                 |
 | ---------------------------- | -------------------------------------- |
@@ -133,16 +150,59 @@ datamodel, graph_id}` after each macrostep; rehydrate on boot via
 | `DELETE /instances/:id`      | 200 `{"deleted":true}`; then 404       |
 | `GET /healthz`               | 200; unknown route 404; bad JSON 400   |
 
-**Docker**
+### Test suite (57 tests, 100% contract-layer coverage)
+
+| Test file                            | Tests | Coverage | Notes                          |
+| ------------------------------------ | ----- | -------- | ------------------------------ |
+| `test/engine_test.exs`               | 6     | 100%     | all 6 public functions         |
+| `test/error_test.exs`                | 6     | 100%     | all status/body combos         |
+| `test/router_test.exs`               | 21    | 100%     | init/1, all endpoints, errors  |
+| `test/tracer_test.exs`               | 12    | 100%     | metadata, quiet paths, logging |
+| `test/handlers/healthz_test.exs`     | —     | 100%     | covered via router_test        |
+| `test/handlers/instances_test.exs`   | —     | 100%     | covered via router_test        |
+| `test/handlers/statecharts_test.exs` | —     | 100%     | covered via router_test        |
+
+Coverage enforced via `mix test --cover` (pre-push hook) with a 100% threshold.
+Ignored modules: `Application`, `ScxmlHttpEngine` (top-level), `Tracer`, `CodeReloader`.
+
+### Pre-commit / pre-push pipeline (`lefthook.yml`)
+
+| Hook       | Commands                                                                 |
+| ---------- | ------------------------------------------------------------------------ |
+| pre-commit | `mix format --check-formatted`, `mix credo --strict`, `mix test --stale` |
+| pre-push   | `mix test --cover`                                                       |
+
+Credo: `MissedMetadataKeyInLoggerConfig` disabled (false positive — keys are
+configured inside nested formatter tuples).
+
+### Logging & Tracing
+
+| Feature              | Implementation                                                                    |
+| -------------------- | --------------------------------------------------------------------------------- |
+| Structured JSON logs | `LoggerJSON ~> 7.0` in prod via `{LoggerJSON.Formatters.Logger, metadata: [...]}` |
+| Dev console logs     | `Logger.Formatter.new(metadata: [...])` with all keys                             |
+| Logger levels        | `:debug` dev, `:info` prod                                                        |
+| OTel spans           | `opentelemetry_api ~> 1.3`, `opentelemetry_cowboy ~> 1.0`                         |
+| OTel exporter        | Prod-only via `config/runtime.exs` (OTLP, disabled in dev/test)                   |
+| Request tracing      | `Plug.RequestId` + custom `Tracer` plug injects metadata, logs completion         |
+| Quiet paths          | `/healthz`, `/openapi`, `/swaggerui` suppressed to `:warning` level               |
+
+Reference: `LOGGING_TRACING.md` for full architecture details.
+
+### Docker
 
 - Multi-stage `Dockerfile` → self-contained Mix release on `debian:bookworm-slim`.
 - `mix.exs`: conditional dep — path (`../scxml-orchestrator`) locally, git
-  fallback in the container (needs git in builder).
+  fallback in the container (`branch: main`, locked to commit `dbd9d93`).
 - `config/runtime.exs`: runtime-configurable `SCXML_HTTP_ENGINE_PORT`.
+- `docker-compose.yml` with Compose Watch for hot reloading (sync `./lib`, `./config`;
+  rebuild on `mix.exs`/`mix.lock`).
 - Verified: image builds (~164 MB), container boots clean (UTF-8 locale set),
   full statechart flow works over HTTP inside the container.
 
-**Notes**
+Reference: `HOT_RELOADING_DOCKER.md` for the hot reload workflow.
+
+### Notes
 
 - `DELETE` uses `GenServer.stop(pid)`; the library's registry entry is keyed to
   the instance process, so it auto-unregisters on termination.
