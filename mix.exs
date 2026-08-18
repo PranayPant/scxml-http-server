@@ -54,11 +54,6 @@ defmodule ScxmlHttpEngine.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # Transports on top of the in-process SCXML runtime.
-      #
-      # Pinned to a git tag from the orchestrator's release workflow.
-      # For local development, override via `mix deps.update` or
-      # temporarily swap to `path: "../scxml-orchestrator"`.
       {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7"},
