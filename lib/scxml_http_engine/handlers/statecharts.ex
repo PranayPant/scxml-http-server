@@ -23,6 +23,7 @@ defmodule ScxmlHttpEngine.Handlers.Statecharts do
     with {:ok, body} <- read_json(conn),
          %{"document" => document} when not is_nil(document) <- body do
       document = normalize_document(document)
+      Logger.info("statecharts: received document", byte_length: byte_size(document))
       result = Engine.register_and_start(document, body["instance_id"])
       {status, payload} = to_created(result)
       Plug.Conn.send_resp(conn, status, payload)
