@@ -54,12 +54,7 @@ defmodule ScxmlHttpEngine.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      # Transports on top of the in-process SCXML runtime.
-      #
-      # Local dev uses the sibling checkout (../scxml-orchestrator); container
-      # / CI builds where that path does not exist fall back to the git
-      # dependency so `docker build` works without extra context.
-      scxml_orchestrator_dep(),
+      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7"},
       {:open_api_spex, "~> 3.19"},
@@ -74,11 +69,4 @@ defmodule ScxmlHttpEngine.MixProject do
     ]
   end
 
-  defp scxml_orchestrator_dep do
-    if File.dir?("../scxml-orchestrator") do
-      {:scxml_orchestrator, path: "../scxml-orchestrator"}
-    else
-      {:scxml_orchestrator, git: "https://github.com/PranayPant/scxml-orchestrator.git", branch: "main"}
-    end
-  end
 end

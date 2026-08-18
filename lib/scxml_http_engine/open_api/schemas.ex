@@ -63,7 +63,7 @@ defmodule ScxmlHttpEngine.OpenApi.Schemas do
         type: %Schema{
           type: :string,
           description: "State type",
-          enum: ["atomic", "compound", "parallel", "final", "initial"]
+          enum: ["atomic", "compound", "parallel", "final", "history"]
         }
       },
       required: [:id, :status, :type]

@@ -17,6 +17,8 @@ defmodule ScxmlHttpEngine.Handlers.Instances do
   alias ScxmlHttpEngine.Error
   alias ScxmlHttpEngine.OpenApi.Schemas
 
+  require Logger
+
   @impl Plug
   def init(opts), do: opts
 
@@ -54,6 +56,7 @@ defmodule ScxmlHttpEngine.Handlers.Instances do
     with {:ok, body} <- read_json(conn),
          %{"graph_id" => graph_id} when is_binary(graph_id) <- body do
       initial_datamodel = body["initial_datamodel"] || %{}
+      Logger.info("instances: starting instance", graph_id: graph_id, instance_id: body["instance_id"])
       result = Engine.start_instance(graph_id, body["instance_id"], initial_datamodel)
       {status, payload} = to_created(result)
       Plug.Conn.send_resp(conn, status, payload)

@@ -71,7 +71,8 @@ defmodule ScxmlHttpEngine.Tracer do
           Logger.error("API Request Failed",
             status: status,
             method: callback_conn.method,
-            path: callback_conn.request_path
+            path: callback_conn.request_path,
+            body: callback_conn.resp_body
           )
 
         # 2xx / 4xx â†’ :info level (unless this is a quiet route)
@@ -80,7 +81,8 @@ defmodule ScxmlHttpEngine.Tracer do
             Logger.info("API Request Completed",
               status: status,
               method: callback_conn.method,
-              path: callback_conn.request_path
+              path: callback_conn.request_path,
+              body: callback_conn.resp_body
             )
           end
       end
