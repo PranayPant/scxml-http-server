@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 0.1.0)"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout server
+        uses: actions/checkout@v4
+        with:
+          path: scxml-http-server
+
+      - name: Checkout orchestrator (server dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: PranayPant/scxml-orchestrator
+          path: scxml-orchestrator
+
+      # --- Elixir setup for OpenAPI dump ---
+      - name: Setup BEAM
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20"
+          otp-version: "27"
+
+      - name: Install server deps
+        run: mix deps.get
+        working-directory: scxml-http-server
+
+      - name: Dump OpenAPI spec
+        run: mix openapi.spec.json --spec ScxmlHttpEngine.OpenApi.ApiSpec --filename openapi.json --start-app=false
+        working-directory: scxml-http-server
+
+      # --- Create release tarball (mix hex.build) ---
+      - name: Build Hex package
+        run: mix hex.build --output scxml-http-engine-${{ github.event.inputs.version }}.tar
+        working-directory: scxml-http-server
+
+      # --- Create GitHub Release ---
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          files: |
+            scxml-http-server/openapi.json
+            scxml-http-server/scxml-http-engine-${{ github.event.inputs.version }}.tar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
