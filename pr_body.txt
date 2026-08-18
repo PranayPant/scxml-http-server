@@ -1,0 +1,22 @@
+﻿## Summary
+
+Adds a release workflow that publishes the OpenAPI spec as a release asset, and simplifies the orchestrator dependency to use a git tag.
+
+## Changes
+
+### New: .github/workflows/release.yml
+- **Trigger**: workflow_dispatch with a required version input.
+- **Steps**: Checkout, setup BEAM, mix deps.get (fetches orchestrator from git tag), dump OpenAPI spec, create GitHub Release.
+- Uses softprops/action-gh-release@v3 with permissions: contents: write and generate_release_notes: true.
+
+### Modified: mix.exs
+- Replaced File.dir? path/orchestrator-checkout hack with a clean git tag dep: {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"}.
+
+### Removed: SCXML-TypeGen-Pipeline.md
+- Planning doc, no longer needed.
+
+## Why
+
+- Git tag is the package: Elixir's mix natively supports github: ... tag: deps.
+- Simpler CI: no manual orchestrator checkout in the release workflow.
+- Deterministic: pinning to a tag guarantees reproducible builds.

@@ -68,5 +68,4 @@ defmodule ScxmlHttpEngine.MixProject do
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false}
     ]
   end
-
 end
