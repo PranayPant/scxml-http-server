@@ -59,7 +59,7 @@ defmodule ScxmlHttpEngine.MixProject do
       # Pinned to a git tag from the orchestrator's release workflow.
       # For local development, override via `mix deps.update` or
       # temporarily swap to `path: "../scxml-orchestrator"`.
-      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.1.0"},
+      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7"},
       {:open_api_spex, "~> 3.19"},
