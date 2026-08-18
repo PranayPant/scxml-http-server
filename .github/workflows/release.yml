@@ -38,18 +38,11 @@ jobs:
         run: mix openapi.spec.json --spec ScxmlHttpEngine.OpenApi.ApiSpec --filename openapi.json --start-app=false
         working-directory: scxml-http-server
 
-      # --- Create release tarball (mix hex.build) ---
-      - name: Build Hex package
-        run: mix hex.build --output scxml-http-engine-${{ github.event.inputs.version }}.tar
-        working-directory: scxml-http-server
-
-      # --- Create GitHub Release ---
+      # --- Create GitHub Release (publish OpenAPI spec as release asset) ---
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ github.event.inputs.version }}
-          files: |
-            scxml-http-server/openapi.json
-            scxml-http-server/scxml-http-engine-${{ github.event.inputs.version }}.tar
+          files: scxml-http-server/openapi.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
