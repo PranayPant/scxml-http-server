@@ -19,12 +19,6 @@ jobs:
         with:
           path: scxml-http-server
 
-      - name: Checkout orchestrator (server dependency)
-        uses: actions/checkout@v4
-        with:
-          repository: PranayPant/scxml-orchestrator
-          path: scxml-orchestrator
-
       # --- Elixir setup for OpenAPI dump ---
       - name: Setup BEAM
         uses: erlef/setup-beam@v1
