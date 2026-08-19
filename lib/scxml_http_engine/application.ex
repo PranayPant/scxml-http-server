@@ -9,8 +9,8 @@ defmodule ScxmlHttpEngine.Application do
 
   @impl true
   def start(_type, _args) do
-    # Initialise the automated Cowboy network-level tracing spans.
-    :opentelemetry_cowboy.setup()
+    # Initialise the automated Bandit network-level tracing spans.
+    OpentelemetryBandit.setup()
 
     port = Application.get_env(:scxml_http_engine, ScxmlHttpEngine.Router, [])[:port] || 4000
 
@@ -18,7 +18,7 @@ defmodule ScxmlHttpEngine.Application do
       # The HTTP transport. `scxml-orchestrator` is a runtime dependency whose
       # own OTP application already boots the Registry + Instance supervisor,
       # so we do NOT add it here.
-      {Plug.Cowboy, scheme: :http, plug: ScxmlHttpEngine.Router, options: [port: port]}
+      {Bandit, plug: ScxmlHttpEngine.Router, scheme: :http, port: port}
     ]
 
     opts = [strategy: :one_for_one, name: ScxmlHttpEngine.Supervisor]

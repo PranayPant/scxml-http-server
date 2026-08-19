@@ -62,10 +62,12 @@ defmodule ScxmlHttpEngine.Handlers.Statecharts do
   end
 
   defp read_json(conn) do
-    with {:ok, body, _} <- Plug.Conn.read_body(conn, length: 1_000_000),
-         {:ok, decoded} <- Jason.decode(body) do
-      {:ok, decoded}
-    else
+    # The request body is cached by ScxmlHttpEngine.Plugs.OtelPayloadLogger,
+    # which reads the socket once so it can peek for observability.
+    body = conn.assigns[:raw_request_body] || ""
+
+    case Jason.decode(body) do
+      {:ok, decoded} -> {:ok, decoded}
       _ -> {:error, :bad_json}
     end
   end
