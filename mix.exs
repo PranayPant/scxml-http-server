@@ -60,7 +60,7 @@ defmodule ScxmlHttpEngine.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"},
+      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.3"},
       {:jason, "~> 1.4"},
       {:bandit, "~> 1.12"},
       {:open_api_spex, "~> 3.19"},

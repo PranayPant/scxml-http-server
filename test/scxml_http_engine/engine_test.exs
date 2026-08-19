@@ -115,10 +115,4 @@ defmodule ScxmlHttpEngine.EngineTest do
       assert {:error, :not_found} = Engine.remove_instance("missing_instance")
     end
   end
-
-  describe "wait_until_unregistered/2" do
-    test "returns :ok immediately when no attempts remain (timeout guard)" do
-      assert :ok = Engine.wait_until_unregistered("whatever", 0)
-    end
-  end
 end

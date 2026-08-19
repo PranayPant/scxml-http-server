@@ -139,8 +139,9 @@ defmodule ScxmlHttpEngine.Engine do
   @doc """
   Stop and remove an instance.
 
-  Terminating the instance process auto-unregisters it from the library's
-  registry (the entry is keyed to the process).
+  Delegates to `ScxmlEngine.remove_instance/1`, which stops the instance process
+  and synchronously deregisters it — once this returns `{:ok, :deleted}` the
+  instance is no longer discoverable.
 
   Returns `{:ok, :deleted}` or `{:error, :not_found}`.
   """
@@ -148,39 +149,14 @@ defmodule ScxmlHttpEngine.Engine do
   def remove_instance(instance_id) do
     Logger.debug("remove_instance: stopping", instance_id: instance_id)
 
-    case ScxmlEngine.instance_pid(instance_id) do
-      {:ok, pid} ->
-        GenServer.stop(pid)
-        wait_until_unregistered(instance_id)
+    case ScxmlEngine.remove_instance(instance_id) do
+      :ok ->
         Logger.debug("remove_instance: deleted", instance_id: instance_id)
         {:ok, :deleted}
 
-      _ ->
+      :error ->
         Logger.debug("remove_instance: instance not found", instance_id: instance_id)
         {:error, :not_found}
-    end
-  end
-
-  # GenServer.stop/3 is synchronous for the process itself, but the library
-  # registry removes the entry asynchronously on the owner's DOWN. Poll briefly
-  # so the "removed" contract holds immediately after this call returns.
-  #
-  # Public with @doc false solely so the defensive timeout branch (attempts == 0)
-  # can be exercised directly by the test suite.
-  @doc false
-  @spec wait_until_unregistered(String.t(), pos_integer()) :: :ok
-  def wait_until_unregistered(instance_id, attempts \\ 50)
-
-  def wait_until_unregistered(_instance_id, 0), do: :ok
-
-  def wait_until_unregistered(instance_id, attempts) do
-    case ScxmlEngine.instance_pid(instance_id) do
-      {:ok, _pid} ->
-        Process.sleep(10)
-        wait_until_unregistered(instance_id, attempts - 1)
-
-      _ ->
-        :ok
     end
   end
 
