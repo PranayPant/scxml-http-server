@@ -1,12 +1,8 @@
 defmodule ScxmlHttpEngine.Tracer do
   @moduledoc """
   A `Plug` that injects request-level metadata into the Logger process
-  dictionary and registers a `register_before_send` callback for three-level
-  request/response tracing:
-
-    * `:error` â€” 5xx responses
-    * `:info`  â€” 2xx / 4xx responses (suppressed for health-check/API-doc paths)
-    * `:debug` â€” intermediate engine steps logged by `ScxmlHttpEngine.Engine`
+  dictionary so every downstream log line (engine steps, payload logging, etc.)
+  carries the request id and the OpenTelemetry trace/span id.
 
   ## Pipeline placement
 
@@ -19,11 +15,11 @@ defmodule ScxmlHttpEngine.Tracer do
   Health-check and API-documentation endpoints
   (`/healthz`, `/openapi`, `/swaggerui`) are set to `:warning` process-level
   so that `:info` and `:debug` messages are suppressed for those routes.
+
+  > Request/response payload logging and completion logs are handled by
+  > `ScxmlHttpEngine.Plugs.OtelPayloadLogger`; this plug only concerns itself
+  > with metadata stamping and quiet-path suppression.
   """
-
-  import Plug.Conn
-
-  require Logger
 
   @quiet_prefixes ["/healthz", "/openapi", "/swaggerui"]
 
@@ -35,7 +31,7 @@ defmodule ScxmlHttpEngine.Tracer do
     request_id = Process.get(:request_id)
 
     # Safely extract the OTel trace / span context created by
-    # :opentelemetry_cowboy so it can be included in every log line.
+    # :opentelemetry_bandit so it can be included in every log line.
     otel_metadata =
       try do
         case OpenTelemetry.Tracer.current_span_ctx() do
@@ -55,39 +51,10 @@ defmodule ScxmlHttpEngine.Tracer do
     Logger.metadata([request_id: request_id] ++ otel_metadata)
 
     # Suppress info/debug for high-frequency health / API-doc endpoints.
-    is_quiet_route = Enum.any?(@quiet_prefixes, &String.starts_with?(conn.request_path, &1))
-
-    if is_quiet_route do
+    if Enum.any?(@quiet_prefixes, &String.starts_with?(conn.request_path, &1)) do
       Logger.put_process_level(self(), :warning)
     end
 
-    # Register a before-send callback for request-completion logging.
-    register_before_send(conn, fn callback_conn ->
-      status = callback_conn.status
-
-      cond do
-        # 5xx â†’ :error level
-        status >= 500 ->
-          Logger.error("API Request Failed",
-            status: status,
-            method: callback_conn.method,
-            path: callback_conn.request_path,
-            body: callback_conn.resp_body
-          )
-
-        # 2xx / 4xx â†’ :info level (unless this is a quiet route)
-        status < 500 ->
-          if !is_quiet_route do
-            Logger.info("API Request Completed",
-              status: status,
-              method: callback_conn.method,
-              path: callback_conn.request_path,
-              body: callback_conn.resp_body
-            )
-          end
-      end
-
-      callback_conn
-    end)
+    conn
   end
 end

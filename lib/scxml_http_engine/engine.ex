@@ -41,7 +41,9 @@ defmodule ScxmlHttpEngine.Engine do
       with {:ok, pid} <- ScxmlEngine.run(document, opts) do
         resolved_id = instance_id || instance_id_for_pid(pid)
         Logger.debug("register_and_start: instance started", instance_id: resolved_id)
-        {:ok, snapshot_for(resolved_id, pid)}
+        snapshot = snapshot_for(resolved_id, pid)
+        log_snapshot(:start, resolved_id, nil, snapshot)
+        {:ok, snapshot}
       end
     rescue
       # The library raises for structurally-invalid-but-parseable AST JSON
@@ -88,7 +90,11 @@ defmodule ScxmlHttpEngine.Engine do
     with {:ok, pid} <- ScxmlEngine.instance_pid(instance_id),
          :ok <- ScxmlEngine.send_event(pid, event_name, data) do
       Logger.debug("step: event processed", instance_id: instance_id, event: event_name)
-      {:ok, snapshot_for(instance_id, pid)}
+
+      snapshot = snapshot_for(instance_id, pid)
+      log_snapshot(:step, instance_id, event_name, snapshot)
+
+      {:ok, snapshot}
     else
       :error ->
         Logger.debug("step: instance not found", instance_id: instance_id)
@@ -133,8 +139,9 @@ defmodule ScxmlHttpEngine.Engine do
   @doc """
   Stop and remove an instance.
 
-  Terminating the instance process auto-unregisters it from the library's
-  registry (the entry is keyed to the process).
+  Delegates to `ScxmlEngine.remove_instance/1`, which stops the instance process
+  and synchronously deregisters it — once this returns `{:ok, :deleted}` the
+  instance is no longer discoverable.
 
   Returns `{:ok, :deleted}` or `{:error, :not_found}`.
   """
@@ -142,39 +149,14 @@ defmodule ScxmlHttpEngine.Engine do
   def remove_instance(instance_id) do
     Logger.debug("remove_instance: stopping", instance_id: instance_id)
 
-    case ScxmlEngine.instance_pid(instance_id) do
-      {:ok, pid} ->
-        GenServer.stop(pid)
-        wait_until_unregistered(instance_id)
+    case ScxmlEngine.remove_instance(instance_id) do
+      :ok ->
         Logger.debug("remove_instance: deleted", instance_id: instance_id)
         {:ok, :deleted}
 
-      _ ->
+      :error ->
         Logger.debug("remove_instance: instance not found", instance_id: instance_id)
         {:error, :not_found}
-    end
-  end
-
-  # GenServer.stop/3 is synchronous for the process itself, but the library
-  # registry removes the entry asynchronously on the owner's DOWN. Poll briefly
-  # so the "removed" contract holds immediately after this call returns.
-  #
-  # Public with @doc false solely so the defensive timeout branch (attempts == 0)
-  # can be exercised directly by the test suite.
-  @doc false
-  @spec wait_until_unregistered(String.t(), pos_integer()) :: :ok
-  def wait_until_unregistered(instance_id, attempts \\ 50)
-
-  def wait_until_unregistered(_instance_id, 0), do: :ok
-
-  def wait_until_unregistered(instance_id, attempts) do
-    case ScxmlEngine.instance_pid(instance_id) do
-      {:ok, _pid} ->
-        Process.sleep(10)
-        wait_until_unregistered(instance_id, attempts - 1)
-
-      _ ->
-        :ok
     end
   end
 
@@ -193,6 +175,28 @@ defmodule ScxmlHttpEngine.Engine do
       execution_status: ScxmlEngine.execution_status(pid),
       active_states: ScxmlEngine.active_states(pid)
     }
+  end
+
+  # Emit a single structured debug line for a snapshot so the dataplane log is
+  # self-contained per step: the event, the post-event configuration, whether
+  # the instance is done, and its execution status. This surfaces silent state
+  # drift (e.g. an event processed but the config ending up inconsistent) that
+  # event-name-only logging cannot reveal.
+  @spec log_snapshot(atom(), String.t(), String.t() | nil, snapshot()) :: :ok
+  defp log_snapshot(kind, instance_id, event_name, snapshot) do
+    Logger.debug("snapshot: #{kind}",
+      instance_id: instance_id,
+      event: event_name,
+      configuration: snapshot.configuration,
+      done: snapshot.done,
+      execution_status: snapshot.execution_status,
+      active_states:
+        Enum.map(snapshot.active_states, fn s ->
+          %{id: s.id, status: s.status, type: s.type}
+        end)
+    )
+
+    :ok
   end
 
   defp instance_id_for_pid(pid) do

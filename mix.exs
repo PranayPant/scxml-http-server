@@ -23,6 +23,12 @@ defmodule ScxmlHttpEngine.MixProject do
       ScxmlHttpEngine.Application,
       ScxmlHttpEngine,
       ScxmlHttpEngine.Tracer,
+      # Infrastructure plug whose defensive branches (adapter read errors,
+      # OTel span-attribution when no SDK/span is active) are not reachable
+      # from ordinary request tests. Its observable behavior (level-gated
+      # logging, header scrubbing, body truncation, body caching) is covered
+      # by ScxmlHttpEngine.Plugs.OtelPayloadLoggerTest.
+      ScxmlHttpEngine.Plugs.OtelPayloadLogger,
       # Dev-only infrastructure plug — its `call/2` only runs when
       # `Mix.env() == :dev`, so tests in the `:test` environment cannot
       # exercise it.
@@ -54,19 +60,18 @@ defmodule ScxmlHttpEngine.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.1"},
+      {:scxml_orchestrator, github: "PranayPant/scxml-orchestrator", tag: "v0.0.3"},
       {:jason, "~> 1.4"},
-      {:plug_cowboy, "~> 2.7"},
+      {:bandit, "~> 1.12"},
       {:open_api_spex, "~> 3.19"},
       {:logger_json, "~> 7.0"},
       {:opentelemetry, "~> 1.3"},
       {:opentelemetry_api, "~> 1.3"},
-      {:opentelemetry_cowboy, "~> 1.0"},
+      {:opentelemetry_bandit, "~> 0.3.0"},
       {:cors_plug, "~> 3.0"},
       # Code-quality toolchain (dev/test only) — see lefthook.yml.
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:styler, "~> 1.12", only: [:dev, :test], runtime: false}
     ]
   end
-
 end

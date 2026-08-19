@@ -1,7 +1,6 @@
 defmodule ScxmlHttpEngine.TracerTest do
   use ExUnit.Case, async: true
 
-  import ExUnit.CaptureLog
   import Plug.Conn
   import Plug.Test
 
@@ -77,72 +76,6 @@ defmodule ScxmlHttpEngine.TracerTest do
       |> send_resp(200, "ok")
 
       assert Logger.get_process_level(self()) != :warning
-    end
-  end
-
-  describe "request completion logging" do
-    test "logs info for 2xx responses" do
-      log_output =
-        capture_log(fn ->
-          :get
-          |> conn("/api/v1/engine/run")
-          |> Tracer.call([])
-          |> send_resp(200, "OK")
-        end)
-
-      assert log_output =~ "[info]"
-      assert log_output =~ "API Request Completed"
-    end
-
-    test "logs info for 4xx responses" do
-      log_output =
-        capture_log(fn ->
-          :get
-          |> conn("/api/v1/engine/run")
-          |> Tracer.call([])
-          |> send_resp(404, "Not Found")
-        end)
-
-      assert log_output =~ "[info]"
-      assert log_output =~ "API Request Completed"
-    end
-
-    test "logs error for 5xx responses" do
-      log_output =
-        capture_log(fn ->
-          :post
-          |> conn("/api/v1/engine/run")
-          |> Tracer.call([])
-          |> send_resp(500, "Internal Server Error")
-        end)
-
-      assert log_output =~ "[error]"
-      assert log_output =~ "API Request Failed"
-    end
-
-    test "does not log info for 2xx responses on quiet paths" do
-      log_output =
-        capture_log(fn ->
-          :get
-          |> conn("/healthz")
-          |> Tracer.call([])
-          |> send_resp(200, "ok")
-        end)
-
-      refute log_output =~ "API Request Completed"
-    end
-
-    test "does log error for 5xx responses even on quiet paths" do
-      log_output =
-        capture_log(fn ->
-          :get
-          |> conn("/healthz")
-          |> Tracer.call([])
-          |> send_resp(500, "fail")
-        end)
-
-      assert log_output =~ "[error]"
-      assert log_output =~ "API Request Failed"
     end
   end
 end

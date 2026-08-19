@@ -27,6 +27,7 @@ defmodule ScxmlHttpEngine.Router do
 
   plug(Plug.RequestId)
   plug(ScxmlHttpEngine.Tracer)
+  plug(ScxmlHttpEngine.Plugs.OtelPayloadLogger)
 
   plug(OpenApiSpex.Plug.PutApiSpec, module: ScxmlHttpEngine.OpenApi.ApiSpec)
   plug(:match)
