@@ -9,6 +9,14 @@ services:
     environment:
       - MIX_ENV=dev
       - SCXML_HTTP_ENGINE_PORT=4000
+      # Export OTel spans to the collector (scxml-http-server/otel/otelcol-config.yaml).
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      # Set to "debug" to also emit the fine-grained interpreter spans
+      # (select_transitions / execute_transition / expression.evaluate).
+      # - SCXML_HTTP_ENGINE_LOG_LEVEL=debug
+    depends_on:
+      - otel-collector
     develop:
       watch:
         # Sync Elixir source and config files instantly without rebuilding
@@ -18,9 +26,37 @@ services:
         - action: sync
           path: ./config
           target: /app/config
+        - action: sync
+          path: ./otel
+          target: /app/otel
 
         # Rebuild the entire image if dependencies change
         - action: rebuild
           path: mix.exs
         - action: rebuild
           path: mix.lock
+
+  # Central OpenTelemetry Collector: receives OTLP from the browser
+  # (scxml-ui-editor) and the Elixir server, filters health-check noise,
+  # batches, and forwards everything to Jaeger.
+  otel-collector:
+    image: otel/opentelemetry-collector:0.119.0
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/otelcol-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP/gRPC
+      - "4318:4318" # OTLP/HTTP (browser + Elixir exporter)
+    depends_on:
+      - jaeger
+    # Increase to something like OTEL_SAMPLING_PERCENT=10 for a
+    # production-like sampling rate (see otel/otelcol-config.yaml).
+
+  # Jaeger all-in-one: trace backend + waterfall UI at http://localhost:16686.
+  # Accepts OTLP/HTTP from the collector on its internal :4318.
+  jaeger:
+    image: jaegertracing/all-in-one:1.66.0
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger UI
