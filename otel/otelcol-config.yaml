@@ -1,0 +1,87 @@
+# OpenTelemetry Collector configuration for the SCXML workspace.
+#
+# Central trace hub: every project (browser UI editor, browser client,
+# parser, Elixir HTTP server, in-process orchestrator) emits OTLP spans to
+# this collector, which normalizes, filters noise, batches, and forwards to
+# Jaeger for human-readable waterfall debugging (http://localhost:16686).
+#
+# Ports:
+#   :4317  OTLP/gRPC  (reserved for gRPC clients)
+#   :4318  OTLP/HTTP  (browser OTel Web SDK + Elixir opentelemetry_exporter)
+#
+# Noise strategy (INFO vs DEBUG detail is gated at the APPLICATIONS, not here):
+#   - healthz/openapi/swaggerui traces are dropped outright
+#   - everything else is sampled at 100% locally; set OTEL_SAMPLING_PERCENT
+#     lower for a production-like deployment
+#   - spans are batched to keep per-request churn low
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        # The browser (Vite dev server on :5173) posts OTLP/HTTP straight to
+        # this receiver, so it needs CORS to allow the cross-origin request.
+        cors:
+          allowed_origins:
+            - "http://localhost:5173"
+            - "http://127.0.0.1:5173"
+          allowed_headers:
+            - "content-type"
+            - "traceparent"
+            - "tracestate"
+            - "baggage"
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # Drop health-check / API-doc traffic before it reaches Jaeger. These are
+  # single-span traces (no interpreter work) that add only noise.
+  filter/healthz:
+    error_mode: ignore
+    traces:
+      span:
+        - 'attributes["url.path"] == "/healthz"'
+        - 'attributes["url.path"] == "/openapi"'
+        - 'attributes["url.path"] == "/swaggerui"'
+
+  # Sampling knob for production-like runs. 100% locally so traces are
+  # complete and instant; lower the percentage when volume matters.
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 10000
+    policies:
+      - name: errors-always
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: probabilistic
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:OTEL_SAMPLING_PERCENT:-100}
+
+  batch:
+    send_batch_size: 512
+    timeout: 5s
+
+exporters:
+  # Human-readable stream of the collected spans (one line per span) so a
+  # `docker compose logs -f otel-collector` shows the live flow.
+  debug:
+    verbosity: basic
+  # Jaeger all-in-one accepts OTLP/HTTP on :4318.
+  otlp/jaeger:
+    endpoint: http://jaeger:4318
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, filter/healthz, tail_sampling, batch]
+      exporters: [debug, otlp/jaeger]

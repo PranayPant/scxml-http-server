@@ -68,6 +68,9 @@ defmodule ScxmlHttpEngine.MixProject do
       {:opentelemetry, "~> 1.3"},
       {:opentelemetry_api, "~> 1.3"},
       {:opentelemetry_bandit, "~> 0.3.0"},
+      # OTLP exporter: forwards spans to the OpenTelemetry Collector
+      # (otel/otelcol-config.yaml + Jaeger) instead of stdout-only.
+      {:opentelemetry_exporter, "~> 1.7"},
       {:cors_plug, "~> 3.0"},
       # Code-quality toolchain (dev/test only) — see lefthook.yml.
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
